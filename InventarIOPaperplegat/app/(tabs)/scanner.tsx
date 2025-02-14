@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { View, Text, TextInput, Button, Alert } from 'react-native';
-import { RNCamera, BarCodeReadEvent } from 'react-native-camera';
+import { useEffect, useState } from 'react';
+import { View, Text, TextInput, Button, Alert, StyleSheet } from 'react-native';
+import { Camera, CameraType, BarcodeScanningResult } from 'expo-camera';
 import { useForm, Controller } from 'react-hook-form';
 
 type FormData = {
@@ -11,9 +11,18 @@ type FormData = {
 const Scanner = () => {
   const [barcode, setBarcode] = useState('');
   const { control, handleSubmit, reset } = useForm<FormData>();
+  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const [cameraType, setCameraType] = useState('back');
 
-  const handleBarCodeScanned = (event: BarCodeReadEvent) => {
-    setBarcode(event.data); // Guarda el código de barras escaneado
+  useEffect(() => {
+    (async () => {
+      const { status } = await Camera.requestCameraPermissionsAsync();
+      setHasPermission(status === 'granted');
+    })();
+  }, []);
+
+  const handleBarCodeScanned = ({ type, data }: BarcodeScanningResult) => {
+    setBarcode(data); // Guarda el código de barras escaneado
   };
 
   const onSubmit = (data: FormData) => {
@@ -22,32 +31,35 @@ const Scanner = () => {
     reset(); // Limpiar el formulario después de enviarlo
   };
 
+  if (hasPermission === null) {
+    return <Text>Solicitando permiso para usar la cámara</Text>;
+  }
+  if (hasPermission === false) {
+    return <Text>No se ha concedido permiso para usar la cámara</Text>;
+  }
+
   return (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+    <View style={styles.container}>
       {/* Cámara para escanear el código de barras */}
-      <RNCamera
-        style={{ width: '100%', height: 300 }}
-        onBarCodeRead={handleBarCodeScanned}
-        captureAudio={false}
+      <Camera
+        style={styles.camera}
+        type={cameraType}
+        onBarCodeScanned={handleBarCodeScanned}
       >
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <Text style={{ fontSize: 20, color: 'white' }}>
-            Escanea un código de barras
-          </Text>
+        <View style={styles.cameraOverlay}>
+          <Text style={styles.cameraText}>Escanea un código de barras</Text>
         </View>
-      </RNCamera>
+      </Camera>
 
       {/* Mostrar el código de barras escaneado */}
       {barcode ? (
-        <View style={{ marginTop: 20 }}>
-          <Text style={{ fontSize: 18 }}>
-            Código escaneado: {barcode}
-          </Text>
+        <View style={styles.barcodeContainer}>
+          <Text style={styles.barcodeText}>Código escaneado: {barcode}</Text>
         </View>
       ) : null}
 
       {/* Formulario */}
-      <View style={{ marginTop: 40, width: '80%' }}>
+      <View style={styles.formContainer}>
         <Controller
           control={control}
           name="name"
@@ -55,13 +67,7 @@ const Scanner = () => {
           rules={{ required: 'El nombre es obligatorio' }}
           render={({ field: { onChange, onBlur, value } }) => (
             <TextInput
-              style={{
-                borderWidth: 1,
-                padding: 10,
-                marginBottom: 10,
-                borderColor: 'gray',
-                borderRadius: 5,
-              }}
+              style={styles.input}
               placeholder="Nombre del producto"
               onBlur={onBlur}
               onChangeText={onChange}
@@ -77,13 +83,7 @@ const Scanner = () => {
           rules={{ required: 'El precio es obligatorio' }}
           render={({ field: { onChange, onBlur, value } }) => (
             <TextInput
-              style={{
-                borderWidth: 1,
-                padding: 10,
-                marginBottom: 10,
-                borderColor: 'gray',
-                borderRadius: 5,
-              }}
+              style={styles.input}
               placeholder="Precio del producto"
               onBlur={onBlur}
               onChangeText={onChange}
@@ -98,5 +98,43 @@ const Scanner = () => {
     </View>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  camera: {
+    width: '100%',
+    height: 300,
+  },
+  cameraOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cameraText: {
+    fontSize: 20,
+    color: 'white',
+  },
+  barcodeContainer: {
+    marginTop: 20,
+  },
+  barcodeText: {
+    fontSize: 18,
+  },
+  formContainer: {
+    marginTop: 40,
+    width: '80%',
+  },
+  input: {
+    borderWidth: 1,
+    padding: 10,
+    marginBottom: 10,
+    borderColor: 'gray',
+    borderRadius: 5,
+  },
+});
 
 export default Scanner;
